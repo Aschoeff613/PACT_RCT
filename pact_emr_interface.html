@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PACT EMR Interface</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2128;
+    --border: #30363d;
+    --border-light: #21262d;
+    --text: #e6edf3;
+    --text-muted: #7d8590;
+    --text-dim: #484f58;
+    --accent: #8c1515;
+    --accent-light: #da3633;
+    --blue: #388bfd;
+    --blue-dim: #1f3a5f;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --purple: #bc8cff;
+    --tab-active: #1c2128;
+    --tab-inactive: #0d1117;
+  }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: #080c10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .emr-wrapper {
+    width: 100%;
+    max-width: 1100px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: 0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
+  }
+
+  /* Top bar */
+  .topbar {
+    background: #0d1117;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .pact-badge {
+    background: var(--accent);
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+
+  .patient-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .patient-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .status-pill {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+  }
+
+  .status-active { background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+  .status-critical { background: rgba(218,54,51,0.15); color: var(--accent-light); border: 1px solid rgba(218,54,51,0.3); }
+
+  .timer {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--yellow);
+    background: rgba(210,153,34,0.1);
+    padding: 3px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(210,153,34,0.2);
+  }
+
+  /* Tab bar */
+  .tabbar {
+    background: var(--tab-inactive);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-end;
+    padding: 0 20px;
+    gap: 2px;
+  }
+
+  .tab {
+    padding: 10px 20px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    border: 1px solid transparent;
+    border-bottom: none;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+    bottom: -1px;
+    user-select: none;
+  }
+
+  .tab:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.04);
+  }
+
+  .tab.active {
+    background: var(--tab-active);
+    color: var(--text);
+    border-color: var(--border);
+    border-bottom-color: var(--tab-active);
+  }
+
+  .tab.active .tab-icon { color: var(--blue); }
+
+  .tab-icon { font-size: 13px; }
+
+  .tab-badge {
+    background: var(--accent);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 10px;
+    line-height: 1.4;
+  }
+
+  /* Main layout */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    background: var(--surface);
+    min-height: 520px;
+  }
+
+  /* Content area */
+  .content {
+    padding: 20px;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    display: none;
+  }
+
+  .content.active { display: block; }
+
+  .section-header {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .note-block {
+    background: var(--surface2);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+
+  .note-block h4 {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--blue);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .note-block p {
+    font-size: 12.5px;
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  .note-block p span.highlight { color: var(--yellow); font-weight: 500; }
+  .note-block p span.critical { color: var(--accent-light); font-weight: 600; }
+  .note-block p span.normal { color: var(--green); }
+
+  /* Labs */
+  .labs-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .labs-table th {
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .labs-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-light);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+  }
+  .labs-table tr:last-child td { border-bottom: none; }
+  .val-high { color: var(--accent-light); font-weight: 600; }
+  .val-low { color: var(--blue); }
+  .val-normal { color: var(--green); }
+  .val-critical { color: var(--accent-light); font-weight: 700; background: rgba(218,54,51,0.1); border-radius: 3px; padding: 1px 4px; }
+  .ref-range { color: var(--text-dim); font-size: 11px; }
+
+  /* Imaging */
+  .imaging-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .imaging-panel {
+    background: #000;
+    border-radius: 8px;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .imaging-panel svg { width: 100%; height: 100%; }
+
+  .imaging-label {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .imaging-tag {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(218,54,51,0.8);
+    color: white;
+  }
+
+  /* EKG */
+  .ekg-container {
+    background: #000;
+    border-radius: 8px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+
+  .ekg-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: rgba(100,200,100,0.6);
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+  }
+
+  .ekg-meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 10px;
+  }
+
+  .ekg-reading {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .ekg-reading span { color: var(--green); }
+  .ekg-reading span.warn { color: var(--yellow); }
+
+  /* Sidebar */
+  .sidebar {
+    padding: 16px;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .sidebar-section {
+    background: var(--surface2);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 14px;
+  }
+
+  .sidebar-section h3 {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .vital {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .vital:last-child { border-bottom: none; }
+
+  .vital-name {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .vital-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .vital-val.warn { color: var(--yellow); }
+  .vital-val.critical { color: var(--accent-light); }
+
+  .problem-list { display: flex; flex-direction: column; gap: 5px; }
+
+  .problem-item {
+    font-size: 11.5px;
+    color: var(--text);
+    padding: 5px 8px;
+    background: var(--surface);
+    border-radius: 4px;
+    border-left: 2px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .problem-item.active-problem { border-left-color: var(--accent-light); }
+  .problem-item.chronic { border-left-color: var(--text-dim); color: var(--text-muted); }
+
+  .problem-tag {
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  /* AI Panel */
+  .ai-panel {
+    background: linear-gradient(135deg, #0d1f0d, #0d1117);
+    border: 1px solid rgba(63,185,80,0.2);
+    border-radius: 8px;
+    padding: 14px;
+  }
+
+  .ai-panel h3 {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: rgba(63,185,80,0.6);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ai-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .ai-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 11.5px;
+    color: var(--text);
+    resize: none;
+    outline: none;
+    height: 60px;
+    margin-bottom: 8px;
+  }
+
+  .ai-input::placeholder { color: var(--text-dim); }
+  .ai-input:focus { border-color: rgba(63,185,80,0.4); }
+
+  .ai-buttons {
+    display: flex;
+    gap: 6px;
+  }
+
+  .btn {
+    padding: 6px 12px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    font-family: 'IBM Plex Sans', sans-serif;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-chat {
+    flex: 1;
+    background: rgba(56,139,253,0.15);
+    color: var(--blue);
+    border: 1px solid rgba(56,139,253,0.3);
+  }
+
+  .btn-chat:hover { background: rgba(56,139,253,0.25); }
+
+  .btn-oneshot {
+    flex: 1;
+    background: rgba(140,21,21,0.3);
+    color: #ff6b6b;
+    border: 1px solid rgba(140,21,21,0.5);
+  }
+
+  .btn-oneshot:hover { background: rgba(140,21,21,0.45); }
+
+  .btn-labels {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .btn-label {
+    flex: 1;
+    text-align: center;
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+  }
+
+  /* Task tracker */
+  .task-tracker { }
+
+  .task-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 11px;
+  }
+
+  .task-row:last-child { border-bottom: none; }
+
+  .task-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .task-dot.done { background: var(--green); }
+  .task-dot.current { background: var(--yellow); animation: pulse 1.5s infinite; }
+  .task-dot.pending { background: var(--border); }
+
+  .task-name { color: var(--text-muted); flex: 1; }
+  .task-name.current-task { color: var(--text); font-weight: 500; }
+  .task-score { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--green); }
+
+  .progress-bar-wrap {
+    background: var(--border-light);
+    border-radius: 10px;
+    height: 4px;
+    margin-top: 10px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--blue), var(--green));
+    border-radius: 10px;
+    width: 33%;
+    transition: width 0.3s;
+  }
+
+  .progress-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 5px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* Meds */
+  .med-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 11.5px;
+  }
+  .med-item:last-child { border-bottom: none; }
+  .med-name { color: var(--text); }
+  .med-dose { font-family: 'IBM Plex Mono', monospace; color: var(--text-muted); font-size: 11px; }
+
+  /* Bottom bar */
+  .bottombar {
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    padding: 8px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .bottom-meta {
+    font-size: 10.5px;
+    color: var(--text-dim);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .arm-indicator {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    padding: 3px 10px;
+    border-radius: 3px;
+    background: rgba(56,139,253,0.1);
+    color: var(--blue);
+    border: 1px solid rgba(56,139,253,0.2);
+  }
+</style>
+</head>
+<body>
+
+<div class="emr-wrapper">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="pact-badge">PACT</span>
+      <div>
+        <div class="patient-name">Johnson, Michael R.</div>
+        <div class="patient-meta">68M · MRN 0042817 · ED Arrival 14:32 · CC: Shortness of breath</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="status-pill status-critical">TRIAGE PENDING</span>
+      <span class="timer">⏱ 08:42</span>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tabbar">
+    <div class="tab active" onclick="switchTab('notes', this)">
+      <span class="tab-icon">📋</span> Notes
+    </div>
+    <div class="tab" onclick="switchTab('labs', this)">
+      <span class="tab-icon">🔬</span> Labs
+      <span class="tab-badge">3</span>
+    </div>
+    <div class="tab" onclick="switchTab('imaging', this)">
+      <span class="tab-icon">🩻</span> Imaging
+    </div>
+    <div class="tab" onclick="switchTab('ekg', this)">
+      <span class="tab-icon">❤️</span> EKG
+    </div>
+    <div class="tab" onclick="switchTab('medications', this)">
+      <span class="tab-icon">💊</span> Medications
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="main">
+
+    <!-- Notes tab -->
+    <div class="content active" id="tab-notes">
+      <div class="section-header">History of Present Illness</div>
+      <div class="note-block">
+        <h4>HPI</h4>
+        <p>68-year-old male with <span class="highlight">known CHF (EF 35%)</span> and COPD presenting with <span class="critical">acute onset dyspnea</span> over the past 6 hours. Patient reports worsening orthopnea and bilateral leg swelling over the past week. Denies fever, chest pain, or hemoptysis. Last hospitalization 3 months ago for CHF exacerbation. <span class="highlight">Adherence to furosemide uncertain per family.</span></p>
+      </div>
+
+      <div class="section-header">Physical Examination</div>
+      <div class="note-block">
+        <h4>Exam</h4>
+        <p>Uncomfortable, sitting upright. <span class="critical">SpO2 88% on room air.</span> RR 26. HR 112. BP 158/94. JVD present. Bibasilar crackles on auscultation. <span class="highlight">2+ pitting edema bilateral lower extremities.</span> No wheeze. Abdomen soft, non-tender.</p>
+      </div>
+
+      <div class="section-header">Assessment</div>
+      <div class="note-block">
+        <h4>Working Assessment</h4>
+        <p>Acute decompensated heart failure vs. COPD exacerbation vs. combined etiology. <span class="highlight">Disposition remains unclear</span> pending labs and imaging. Consider ICU if fails initial diuresis.</p>
+      </div>
+    </div>
+
+    <!-- Labs tab -->
+    <div class="content" id="tab-labs">
+      <div class="section-header">Laboratory Results — Resulted 15:04</div>
+      <div class="note-block" style="padding: 0; overflow: hidden;">
+        <table class="labs-table">
+          <thead>
+            <tr>
+              <th>Test</th>
+              <th>Result</th>
+              <th>Reference</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>BNP</td>
+              <td class="val-critical">1,840 pg/mL</td>
+              <td class="ref-range">&lt;100</td>
+              <td class="val-high">CRITICAL ↑</td>
+            </tr>
+            <tr>
+              <td>Creatinine</td>
+              <td class="val-high">2.1 mg/dL</td>
+              <td class="ref-range">0.7–1.3</td>
+              <td class="val-high">HIGH ↑</td>
+            </tr>
+            <tr>
+              <td>Na</td>
+              <td class="val-low">131 mEq/L</td>
+              <td class="ref-range">136–145</td>
+              <td class="val-low">LOW ↓</td>
+            </tr>
+            <tr>
+              <td>K</td>
+              <td class="val-normal">4.2 mEq/L</td>
+              <td class="ref-range">3.5–5.0</td>
+              <td class="val-normal">NORMAL</td>
+            </tr>
+            <tr>
+              <td>WBC</td>
+              <td class="val-high">11.8 K/μL</td>
+              <td class="ref-range">4.5–11.0</td>
+              <td class="val-high">HIGH ↑</td>
+            </tr>
+            <tr>
+              <td>Troponin I</td>
+              <td class="val-high">0.08 ng/mL</td>
+              <td class="ref-range">&lt;0.04</td>
+              <td class="val-high">HIGH ↑</td>
+            </tr>
+            <tr>
+              <td>pH (VBG)</td>
+              <td class="val-low">7.31</td>
+              <td class="ref-range">7.35–7.45</td>
+              <td class="val-low">LOW ↓</td>
+            </tr>
+            <tr>
+              <td>Lactate</td>
+              <td class="val-normal">1.8 mmol/L</td>
+              <td class="ref-range">&lt;2.0</td>
+              <td class="val-normal">NORMAL</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Imaging tab -->
+    <div class="content" id="tab-imaging">
+      <div class="section-header">Radiology — Chest X-Ray PA/Lateral · 14:58</div>
+      <div class="imaging-grid">
+        <div class="imaging-panel">
+          <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="200" height="200" fill="#000"/>
+            <ellipse cx="100" cy="100" rx="85" ry="95" fill="none" stroke="#1a1a1a" stroke-width="8"/>
+            <!-- Ribs -->
+            <path d="M40 60 Q100 50 160 60" fill="none" stroke="#444" stroke-width="1.5"/>
+            <path d="M35 75 Q100 65 165 75" fill="none" stroke="#444" stroke-width="1.5"/>
+            <path d="M32 90 Q100 80 168 90" fill="none" stroke="#3a3a3a" stroke-width="1.5"/>
+            <path d="M30 105 Q100 95 170 105" fill="none" stroke="#333" stroke-width="1.5"/>
+            <path d="M30 120 Q100 110 170 120" fill="none" stroke="#2a2a2a" stroke-width="1.5"/>
+            <!-- Spine -->
+            <rect x="95" y="50" width="10" height="120" fill="#555" rx="2"/>
+            <!-- Heart (enlarged) -->
+            <ellipse cx="95" cy="115" rx="42" ry="38" fill="#222" stroke="#888" stroke-width="1"/>
+            <!-- Haziness bilateral bases -->
+            <ellipse cx="55" cy="145" rx="30" ry="20" fill="rgba(200,200,180,0.18)"/>
+            <ellipse cx="145" cy="148" rx="28" ry="18" fill="rgba(200,200,180,0.15)"/>
+            <!-- Vascular congestion -->
+            <line x1="100" y1="60" x2="70" y2="100" stroke="#666" stroke-width="1" opacity="0.7"/>
+            <line x1="100" y1="60" x2="130" y2="100" stroke="#666" stroke-width="1" opacity="0.7"/>
+          </svg>
+          <div class="imaging-label">PA · 14:58</div>
+          <div class="imaging-tag">ABNORMAL</div>
+        </div>
+        <div class="imaging-panel">
+          <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="200" height="200" fill="#000"/>
+            <ellipse cx="100" cy="100" rx="70" ry="90" fill="none" stroke="#1a1a1a" stroke-width="6"/>
+            <ellipse cx="100" cy="105" rx="35" ry="38" fill="#1c1c1c" stroke="#777" stroke-width="1"/>
+            <path d="M50 140 Q100 130 150 140" fill="rgba(180,180,160,0.2)"/>
+            <path d="M45 150 Q100 140 155 150" fill="rgba(180,180,160,0.15)"/>
+            <rect x="92" y="30" width="16" height="130" fill="#4a4a4a" rx="3"/>
+          </svg>
+          <div class="imaging-label">LAT · 14:58</div>
+        </div>
+      </div>
+      <div class="note-block" style="margin-top: 14px;">
+        <h4>Radiology Read</h4>
+        <p><span class="critical">Cardiomegaly.</span> Bilateral perihilar haziness and vascular congestion consistent with <span class="highlight">acute pulmonary edema.</span> Small bilateral pleural effusions. No pneumothorax. No focal consolidation.</p>
+      </div>
+    </div>
+
+    <!-- EKG tab -->
+    <div class="content" id="tab-ekg">
+      <div class="section-header">12-Lead EKG — 14:45</div>
+      <div class="ekg-container">
+        <div class="ekg-label">LEAD II — CONTINUOUS</div>
+        <svg viewBox="0 0 700 120" xmlns="http://www.w3.org/2000/svg" width="100%">
+          <rect width="700" height="120" fill="#000"/>
+          <!-- Grid -->
+          <defs>
+            <pattern id="smallGrid" width="14" height="14" patternUnits="userSpaceOnUse">
+              <path d="M 14 0 L 0 0 0 14" fill="none" stroke="rgba(0,80,0,0.3)" stroke-width="0.5"/>
+            </pattern>
+            <pattern id="grid" width="70" height="70" patternUnits="userSpaceOnUse">
+              <rect width="70" height="70" fill="url(#smallGrid)"/>
+              <path d="M 70 0 L 0 0 0 70" fill="none" stroke="rgba(0,100,0,0.5)" stroke-width="1"/>
+            </pattern>
+          </defs>
+          <rect width="700" height="120" fill="url(#grid)"/>
+          <!-- EKG trace - sinus tachycardia -->
+          <polyline points="
+            0,60 20,60 22,60 24,55 26,60
+            28,60 30,60 32,30 34,85 36,60 38,62 40,60
+            60,60 62,60 64,55 66,60
+            68,60 70,60 72,30 74,85 76,60 78,62 80,60
+            100,60 102,60 104,55 106,60
+            108,60 110,60 112,30 114,85 116,60 118,62 120,60
+            140,60 142,60 144,55 146,60
+            148,60 150,60 152,30 154,85 156,60 158,62 160,60
+            180,60 182,60 184,55 186,60
+            188,60 190,60 192,30 194,85 196,60 198,62 200,60
+            220,60 222,60 224,55 226,60
+            228,60 230,60 232,30 234,85 236,60 238,62 240,60
+            260,60 262,60 264,55 266,60
+            268,60 270,60 272,30 274,85 276,60 278,62 280,60
+            300,60 302,60 304,55 306,60
+            308,60 310,60 312,30 314,85 316,60 318,62 320,60
+            340,60 342,60 344,55 346,60
+            348,60 350,60 352,30 354,85 356,60 358,62 360,60
+            380,60 382,60 384,55 386,60
+            388,60 390,60 392,30 394,85 396,60 398,62 400,60
+            420,60 422,60 424,55 426,60
+            428,60 430,60 432,30 434,85 436,60 438,62 440,60
+            460,60 462,60 464,55 466,60
+            468,60 470,60 472,30 474,85 476,60 478,62 480,60
+            500,60 502,60 504,55 506,60
+            508,60 510,60 512,30 514,85 516,60 518,62 520,60
+            540,60 542,60 544,55 546,60
+            548,60 550,60 552,30 554,85 556,60 558,62 560,60
+            580,60 582,60 584,55 586,60
+            588,60 590,60 592,30 594,85 596,60 598,62 600,60
+            620,60 622,60 624,55 626,60
+            628,60 630,60 632,30 634,85 636,60 638,62 640,60
+            660,60 700,60
+          " fill="none" stroke="#00cc44" stroke-width="1.5"/>
+        </svg>
+        <div class="ekg-meta">
+          <div class="ekg-reading">Rate: <span class="warn">112 bpm</span></div>
+          <div class="ekg-reading">Rhythm: <span>Sinus Tachycardia</span></div>
+          <div class="ekg-reading">PR: <span>164ms</span></div>
+          <div class="ekg-reading">QRS: <span>88ms</span></div>
+          <div class="ekg-reading">QTc: <span class="warn">468ms</span></div>
+          <div class="ekg-reading">Axis: <span>+45°</span></div>
+        </div>
+      </div>
+      <div class="note-block">
+        <h4>Interpretation</h4>
+        <p>Sinus tachycardia at 112 bpm. <span class="highlight">Borderline prolonged QTc at 468ms.</span> No ST elevation or depression. LVH pattern. Non-specific T-wave changes in V4-V6. No acute ischemic changes.</p>
+      </div>
+    </div>
+
+    <!-- Medications tab -->
+    <div class="content" id="tab-medications">
+      <div class="section-header">Current Medications</div>
+      <div class="note-block" style="padding: 0 0 0 0; overflow:hidden;">
+        <div style="padding: 12px 16px;">
+          <div class="med-item">
+            <span class="med-name">Furosemide</span>
+            <span class="med-dose">40mg PO daily</span>
+          </div>
+          <div class="med-item">
+            <span class="med-name">Carvedilol</span>
+            <span class="med-dose">12.5mg PO BID</span>
+          </div>
+          <div class="med-item">
+            <span class="med-name">Lisinopril</span>
+            <span class="med-dose">10mg PO daily</span>
+          </div>
+          <div class="med-item">
+            <span class="med-name">Spironolactone</span>
+            <span class="med-dose">25mg PO daily</span>
+          </div>
+          <div class="med-item">
+            <span class="med-name">Tiotropium</span>
+            <span class="med-dose">18mcg inh daily</span>
+          </div>
+          <div class="med-item">
+            <span class="med-name">Aspirin</span>
+            <span class="med-dose">81mg PO daily</span>
+          </div>
+          <div class="med-item" style="border-bottom:none;">
+            <span class="med-name">Atorvastatin</span>
+            <span class="med-dose">40mg PO nightly</span>
+          </div>
+        </div>
+      </div>
+      <div class="section-header" style="margin-top:14px;">Allergies</div>
+      <div class="note-block">
+        <p><span class="critical">Penicillin</span> — rash. <span class="normal">NKDA otherwise.</span></p>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+
+      <!-- Vitals -->
+      <div class="sidebar-section">
+        <h3>Vitals</h3>
+        <div class="vital"><span class="vital-name">HR</span><span class="vital-val warn">112 bpm</span></div>
+        <div class="vital"><span class="vital-name">BP</span><span class="vital-val warn">158/94</span></div>
+        <div class="vital"><span class="vital-name">RR</span><span class="vital-val critical">26 /min</span></div>
+        <div class="vital"><span class="vital-name">Temp</span><span class="vital-val">37.8°C</span></div>
+        <div class="vital"><span class="vital-name">SpO2</span><span class="vital-val critical">88% RA</span></div>
+        <div class="vital"><span class="vital-name">Weight</span><span class="vital-val warn">+4.2 kg</span></div>
+      </div>
+
+      <!-- Problem list -->
+      <div class="sidebar-section">
+        <h3>Problem List</h3>
+        <div class="problem-list">
+          <div class="problem-item active-problem">Acute decompensated CHF <span class="problem-tag">Active</span></div>
+          <div class="problem-item active-problem">Hypoxia <span class="problem-tag">Active</span></div>
+          <div class="problem-item chronic">HFrEF (EF 35%) <span class="problem-tag">Chronic</span></div>
+          <div class="problem-item chronic">COPD <span class="problem-tag">Chronic</span></div>
+          <div class="problem-item chronic">CKD Stage 3 <span class="problem-tag">Chronic</span></div>
+          <div class="problem-item chronic">Hypertension <span class="problem-tag">Chronic</span></div>
+        </div>
+      </div>
+
+      <!-- AI Panel -->
+      <div class="ai-panel">
+        <h3><span class="ai-dot"></span> AI Assistant</h3>
+        <textarea class="ai-input" placeholder="Ask about this patient..."></textarea>
+        <div class="ai-buttons">
+          <button class="btn btn-chat">💬 Chat</button>
+          <button class="btn btn-oneshot">⚡ One-Shot</button>
+        </div>
+        <div class="btn-labels">
+          <span class="btn-label">Free prompt</span>
+          <span class="btn-label">Auto-generate</span>
+        </div>
+      </div>
+
+      <!-- Task tracker -->
+      <div class="sidebar-section">
+        <h3>Session Progress</h3>
+        <div class="task-row"><span class="task-dot done"></span><span class="task-name">Triage assessment</span><span class="task-score">8/10</span></div>
+        <div class="task-row"><span class="task-dot done"></span><span class="task-name">Differential diagnosis</span><span class="task-score">9/10</span></div>
+        <div class="task-row"><span class="task-dot current"></span><span class="task-name current-task">Disposition decision</span><span class="task-score">—</span></div>
+        <div class="task-row"><span class="task-dot pending"></span><span class="task-name">Treatment plan</span><span class="task-score">—</span></div>
+        <div class="task-row"><span class="task-dot pending"></span><span class="task-name">Discharge instructions</span><span class="task-score">—</span></div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill"></div></div>
+        <div class="progress-label">Task 3 of 9 · 33% complete</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Bottom bar -->
+  <div class="bottombar">
+    <div class="bottom-meta">PACT Study · Session ID: 0042-B · Tab switches: 3</div>
+    <div class="arm-indicator">ARM 2 — CHAT AGENT</div>
+  </div>
+
+</div>
+
+<script>
+  function switchTab(name, el) {
+    document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    el.classList.add('active');
+  }
+</script>
+
+</body>
+</html>
